@@ -1,0 +1,16 @@
+Product Manager - Mini ProjectAplikasi web manajemen produk sederhana yang dibangun menggunakan PHP Native (PDO), MySQL, dan Bootstrap 5. Proyek ini dibuat untuk memenuhi tugas akhir praktikum/pemrograman web dengan fokus pada keamanan input, pencegahan data ganda, dan antarmuka yang responsif.🚀 Fitur Wajib (Telah Diimplementasikan)Create: Menambahkan data produk (Nama, Kategori, Harga, Stok).Read: Menampilkan daftar produk menggunakan Card yang responsif.Update: Mengubah data produk berdasarkan ID.Delete: Menghapus data produk dengan aman menggunakan metode POST dan validasi token CSRF.Validasi Data:Nama produk minimal 3 karakter ($\ge 3$).Harga produk harus lebih dari 0 ($> 0$).Stok produk tidak boleh bernilai negatif ($\ge 0$).Nama produk unik (tidak boleh ada duplikasi di database).🛡️ Keamanan & Best PracticesSesuai dengan syarat tugas, aplikasi ini menerapkan beberapa standar keamanan:Mencegah SQL Injection: Seluruh query (INSERT, SELECT by ID, UPDATE, DELETE) dieksekusi menggunakan PDO Prepared Statements ($pdo->prepare(...)).Mencegah XSS (Cross-Site Scripting): Seluruh output yang ditampilkan ke HTML di-escape secara ketat menggunakan fungsi:
+htmlspecialchars($data, ENT_QUOTES, "UTF-8")Mencegah Double Submit: Menggunakan pola Post/Redirect/Get (PRG). Setelah proses Create, Update, atau Delete berhasil, halaman akan di-redirect menggunakan header("Location: index.php") sehingga menekan tombol refresh/F5 tidak akan mengirim ulang data.Mencegah CSRF (Cross-Site Request Forgery): Aksi Delete diubah dari GET (URL) menjadi sebuah form POST yang dilengkapi dengan csrf_token dari session pengguna.🛠️ PrasyaratWeb Server lokal seperti XAMPP, MAMP, atau Laragon.PHP versi 7.4 atau lebih baru.MySQL / MariaDB.📂 Cara Instalasi & MenjalankanClone / Download
+Pindahkan semua file proyek ini (config.php, index.php, create.php, edit.php) ke dalam folder server lokal Anda (contoh: htdocs/product-manager jika menggunakan XAMPP).Setup DatabaseBuka phpMyAdmin (biasanya di http://localhost/phpmyadmin).Buat database baru dengan nama product_manager.Jalankan perintah SQL berikut untuk membuat tabel:CREATE TABLE products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    category VARCHAR(100) NOT NULL,
+    price DECIMAL(10,2) NOT NULL,
+    stock INT NOT NULL
+);
+Konfigurasi Koneksi
+Buka file config.php dan pastikan kredensial database sudah sesuai dengan server lokal Anda:$host = 'localhost';
+$db   = 'product_manager';
+$user = 'root'; // Biasanya 'root' di XAMPP
+$pass = '';     // Biasanya kosong di XAMPP
+Jalankan Aplikasi
+Buka web browser dan akses URL: http://localhost/product-manager (sesuaikan dengan nama folder Anda).📝 Struktur Fileconfig.php - Menyimpan konfigurasi koneksi database PDO dan pembuatan CSRF Token.index.php - Halaman utama yang menampilkan daftar produk (Read) dan memproses aksi hapus (Delete).create.php - Halaman form beserta logika validasi untuk menambah produk baru (Create).edit.php - Halaman form beserta logika validasi untuk mengubah produk yang sudah ada (Update).
