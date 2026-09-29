@@ -1,8 +1,14 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 require 'config.php';
 
 // Ambil ID produk dari URL
-$id = $_GET['id'] ?? 0;
+$id = $_GET['id'] ?? null;
+if (!$id) {
+    header("Location: index.php");
+    exit;
+}
 
 $stmt = $pdo->prepare("SELECT * FROM products WHERE id = ?");
 $stmt->execute([$id]);
@@ -13,39 +19,27 @@ if (!$product) {
 }
 
 $errors = [];
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $qty = (int) $_POST['quantity'];
-
+    
     if ($qty <= 0) {
-        $errors[] = "Jumlah pesanan harus minimal 1.";
+        $errors[] = "Jumlah pesanan harus lebih dari 0.";
     } elseif ($qty > $product['stock']) {
-        $errors[] = "Stok tidak cukup! Sisa stok saat ini hanya " . $product['stock'];
-    }
-
-    if (empty($errors)) {
+        $errors[] = "Stok tidak mencukupi! Sisa stok hanya " . $product['stock'] . " pcs.";
+    } else {
         $total_price = $qty * $product['price'];
-
-        // Gunakan Transaction agar jika satu gagal, semua dibatalkan
-        $pdo->beginTransaction();
-        try {
-            // 1. Kurangi stok di tabel products
-            $stmtUpdate = $pdo->prepare("UPDATE products SET stock = stock - ? WHERE id = ?");
-            $stmtUpdate->execute([$qty, $id]);
-
-            // 2. Simpan riwayat pesanan di tabel orders
-            $stmtInsert = $pdo->prepare("INSERT INTO orders (product_id, quantity, total_price) VALUES (?, ?, ?)");
-            $stmtInsert->execute([$id, $qty, $total_price]);
-
-            $pdo->commit();
-            
-            // Kembali ke halaman utama setelah sukses
-            header("Location: index.php");
-            exit;
-        } catch (Exception $e) {
-            $pdo->rollBack();
-            $errors[] = "Gagal memproses pesanan: " . $e->getMessage();
-        }
+        
+        // Simpan pesanan ke tabel orders (agar muncul di history.php)
+        $stmt = $pdo->prepare("INSERT INTO orders (product_name, quantity, total_price) VALUES (?, ?, ?)");
+        $stmt->execute([$product['name'], $qty, $total_price]);
+        
+        // Kurangi stok di tabel products
+        $stmt = $pdo->prepare("UPDATE products SET stock = stock - ? WHERE id = ?");
+        $stmt->execute([$qty, $id]);
+        
+        // Arahkan ke halaman riwayat pesanan setelah sukses
+        header("Location: history.php"); 
+        exit;
     }
 }
 ?>
@@ -54,39 +48,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Pesan Produk</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pesan Menu - Ruang Rindu</title>
+    <!-- Bootstrap 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Google Fonts: Poppins -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Poppins', sans-serif; background-color: #FAF9F6; color: #4A4A4A; }
+        .pos-header { background-color: #FADADD; padding: 25px 20px; color: #4A4A4A; text-align: center; border-bottom-left-radius: 25px; border-bottom-right-radius: 25px; margin-bottom: -40px; box-shadow: 0 4px 15px rgba(250, 218, 221, 0.5); }
+        .form-card { background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); border: none; position: relative; z-index: 10; padding: 30px; }
+        .product-title { font-weight: 700; font-size: 1.4rem; color: #4A4A4A; margin-bottom: 5px; }
+        .product-info { color: #9CA3AF; font-size: 0.95rem; margin-bottom: 25px; }
+        .form-label { font-weight: 600; color: #4A4A4A; font-size: 0.95rem; }
+        .form-control { border-radius: 12px; padding: 12px 15px; border: 2px solid #FFF0F2; font-size: 1rem; text-align: center; font-weight: 600; }
+        .form-control:focus { border-color: #FADADD; box-shadow: 0 0 0 3px rgba(250, 218, 221, 0.3); }
+        
+        .btn-primary { background-color: #C7CEEA; color: #4A4A4A; border: none; border-radius: 12px; padding: 12px 20px; font-weight: 600; }
+        .btn-primary:hover { filter: brightness(0.95); color: #4A4A4A; }
+        .btn-secondary { background-color: transparent; color: #D98A8A; border: 2px solid #FDE4E4; border-radius: 12px; padding: 12px 20px; font-weight: 600; }
+        .btn-secondary:hover { background-color: #FFDAC1; border-color: #FFDAC1; color: #4A4A4A; }
+    </style>
 </head>
-<body class="bg-light">
-    <div class="container mt-5" style="max-width: 500px;">
-        <h2 class="mb-4">Pesan Produk</h2>
+<body>
+    <div class="pos-header">
+        <h2 class="m-0" style="font-weight: 700; font-size: 1.5rem;">Pesan Produk</h2>
+    </div>
 
+    <div class="container mt-5 mb-5" style="max-width: 500px;">
+        
         <?php if (!empty($errors)): ?>
-            <div class="alert alert-danger">
+            <div class="alert alert-danger" style="border-radius: 12px;">
                 <ul class="mb-0">
                     <?php foreach ($errors as $error) echo "<li>$error</li>"; ?>
                 </ul>
             </div>
         <?php endif; ?>
 
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title"><?= htmlspecialchars($product['name'], ENT_QUOTES, 'UTF-8') ?></h5>
-                <p class="text-muted mb-4">
-                    Harga: Rp <?= number_format($product['price'], 0, ',', '.') ?> <br>
-                    Sisa Stok: <strong><?= $product['stock'] ?></strong>
-                </p>
-
-                <form method="POST">
-                    <div class="mb-3">
-                        <label class="form-label">Berapa banyak yang ingin dipesan?</label>
-                        <input type="number" name="quantity" class="form-control" required min="1" max="<?= $product['stock'] ?>" value="1">
-                    </div>
-                    <button type="submit" class="btn btn-success w-100 mb-2">Konfirmasi Pesanan</button>
-                    <a href="index.php" class="btn btn-secondary w-100">Batal</a>
-                </form>
+        <form method="POST" class="form-card">
+            
+            <div class="text-center">
+                <h3 class="product-title text-capitalize"><?= htmlspecialchars($product["name"], ENT_QUOTES, "UTF-8") ?></h3>
+                <div class="product-info">
+                    Harga: <strong>Rp <?= number_format($product["price"], 0, ',', '.') ?></strong> <br>
+                    Sisa Stok: <strong style="<?= $product['stock'] <= 5 ? 'color: #D98A8A;' : 'color: #4A4A4A;' ?>"><?= htmlspecialchars($product["stock"], ENT_QUOTES, "UTF-8") ?> pcs</strong>
+                </div>
             </div>
-        </div>
+
+            <div class="mb-4">
+                <label class="form-label d-block text-center">Berapa banyak yang ingin dipesan?</label>
+                <input type="number" name="quantity" class="form-control" required min="1" max="<?= $product['stock'] ?>" value="1">
+            </div>
+            
+            <div class="d-flex flex-column gap-2">
+                <button type="submit" class="btn btn-primary w-100">Konfirmasi Pesanan</button>
+                <a href="index.php" class="btn btn-secondary text-center text-decoration-none w-100">Batal</a>
+            </div>
+        </form>
     </div>
 </body>
 </html>
