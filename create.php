@@ -1,23 +1,33 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+session_start();
+
+// Mematikan tampilan tulisan error default PHP yang merusak desain
+error_reporting(0);
+ini_set('display_errors', 0);
 require 'config.php';
+
+// HANYA ADMIN YANG BOLEH MENAMBAH PRODUK BARU
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+    die("<h2 style='text-align:center; margin-top:50px; font-family:sans-serif;'>Akses Ditolak! Hanya Admin yang boleh mengakses halaman ini.</h2>");
+}
+
+// Ambil data kategori dari database untuk pilihan form
+$stmtCat = $pdo->query("SELECT * FROM categories");
+$categories = $stmtCat->fetchAll();
 
 $errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name']);
-    $category = trim($_POST['category']);
+    $category_id = (int) $_POST['category_id'];
     $price = (float) $_POST['price'];
     $stock = (int) $_POST['stock'];
-    
-    // Tetapan nama gambar
     $imageName = null;
 
     if (strlen($name) < 3) $errors[] = "Nama produk minimum 3 aksara.";
     if ($price <= 0) $errors[] = "Harga mesti lebih daripada 0.";
     if ($stock < 0) $errors[] = "Stok tidak boleh negatif.";
-    if (empty($category)) $errors[] = "Kategori wajib dipilih.";
+    if (empty($category_id)) $errors[] = "Kategori wajib dipilih.";
 
     $stmt = $pdo->prepare("SELECT id FROM products WHERE name = ?");
     $stmt->execute([$name]);
@@ -33,15 +43,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $imageName = time() . '_' . preg_replace("/[^a-zA-Z0-9.]/", "", $fileName); 
         $uploadDir = 'uploads/';
         
+        // --- SCRIPT OTOMATIS: BUAT FOLDER JIKA BELUM ADA ---
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0777, true);
+        }
+        // ---------------------------------------------------
+
         if (!move_uploaded_file($tmpName, $uploadDir . $imageName)) {
-            $errors[] = "Gagal memuat naik gambar. Pastikan folder 'uploads' wujud.";
+            $errors[] = "Gagal memuat naik gambar. Pastikan file tidak rusak.";
         }
     }
 
-    // SIMPAN KE DATABASE
     if (empty($errors)) {
-        $stmt = $pdo->prepare("INSERT INTO products (name, category, price, stock, image) VALUES (?, ?, ?, ?, ?)");
-        $stmt->execute([$name, $category, $price, $stock, $imageName]);
+        $stmt = $pdo->prepare("INSERT INTO products (name, category_id, price, stock, image) VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute([$name, $category_id, $price, $stock, $imageName]);
         
         header("Location: index.php");
         exit;
@@ -55,9 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tambah Menu - Ruang Rindu</title>
-    <!-- Bootstrap 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Google Fonts: Poppins -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
@@ -75,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
     <div class="pos-header">
-        <h2 class="m-0" style="font-weight: 700; font-size: 1.5rem;">Tambah Menu Baru</h2>
+        <h2 class="m-0" style="font-weight: 700; font-size: 1.5rem;">Tambah Menu Baharu</h2>
     </div>
 
     <div class="container mt-5 mb-5" style="max-width: 600px;">
@@ -95,16 +108,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             <div class="mb-3">
                 <label class="form-label">Kategori</label>
-                <select name="category" class="form-select" required>
-                    <option value="" disabled <?= empty($_POST['category']) ? 'selected' : '' ?>>-- Pilih Kategori --</option>
-                    <option value="Coffee" <?= (isset($_POST['category']) && $_POST['category'] === 'Coffee') ? 'selected' : '' ?>>Coffee</option>
-                    <option value="Non Coffee" <?= (isset($_POST['category']) && $_POST['category'] === 'Non Coffee') ? 'selected' : '' ?>>Non Coffee</option>
-                    <option value="Makanan" <?= (isset($_POST['category']) && $_POST['category'] === 'Makanan') ? 'selected' : '' ?>>Makanan</option>
+                <!-- DATA KATEGORI DIAMBIL DARI DATABASE -->
+                <select name="category_id" class="form-select" required>
+                    <option value="" disabled <?= empty($_POST['category_id']) ? 'selected' : '' ?>>-- Pilih Kategori --</option>
+                    <?php foreach ($categories as $cat): ?>
+                        <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></option>
+                    <?php endforeach; ?>
                 </select>
             </div>
             
             <div class="mb-3">
-                <label class="form-label">Gambar Menu (Opsional)</label>
+                <label class="form-label">Gambar Menu (Pilihan)</label>
                 <input type="file" name="image" class="form-control" accept="image/png, image/jpeg, image/jpg">
                 <small class="text-muted" style="font-size: 0.8rem;">Format: JPG atau PNG.</small>
             </div>

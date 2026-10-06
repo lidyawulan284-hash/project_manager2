@@ -3,6 +3,23 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 require 'config.php';
 
+// --- SCRIPT PERBAIKAN DATABASE OTOMATIS ---
+try {
+    // Mengecek apakah tabel orders sudah memiliki kolom yang benar
+    $pdo->query("SELECT product_name FROM orders LIMIT 1");
+} catch (Exception $e) {
+    // Jika kolom tidak ditemukan (error), sistem akan mereset dan membuat tabel yang benar
+    $pdo->exec("DROP TABLE IF EXISTS orders");
+    $pdo->exec("CREATE TABLE orders (
+        id INT(11) AUTO_INCREMENT PRIMARY KEY,
+        product_name VARCHAR(150) NOT NULL,
+        quantity INT(11) NOT NULL,
+        total_price DECIMAL(10,2) NOT NULL,
+        order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )");
+}
+// ------------------------------------------
+
 // Ambil ID produk dari URL
 $id = $_GET['id'] ?? null;
 if (!$id) {
@@ -29,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $total_price = $qty * $product['price'];
         
-        // Simpan pesanan ke tabel orders (agar muncul di history.php)
+        // Simpan pesanan ke tabel orders
         $stmt = $pdo->prepare("INSERT INTO orders (product_name, quantity, total_price) VALUES (?, ?, ?)");
         $stmt->execute([$product['name'], $qty, $total_price]);
         
