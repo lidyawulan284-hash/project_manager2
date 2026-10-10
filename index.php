@@ -1,15 +1,16 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require 'config.php';
 
-// CEK KEAMANAN: Harus login dulu
+// CEK KEAMANAN
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
-    // Hanya admin yang boleh menghapus (opsional, sebagai pengaman)
     if ($_SESSION['role'] === 'admin') {
         $stmt = $pdo->prepare("DELETE FROM products WHERE id = ?");
         $stmt->execute([$_POST['delete_id']]);
@@ -18,7 +19,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
     exit;
 }
 
-// Ambil data produk DIGABUNG dengan nama kategorinya
 $stmt = $pdo->query("
     SELECT p.*, c.name AS category_name 
     FROM products p 
@@ -27,7 +27,6 @@ $stmt = $pdo->query("
 ");
 $products = $stmt->fetchAll();
 
-// Ambil data kategori untuk tombol filter
 $stmtCat = $pdo->query("SELECT * FROM categories");
 $categories = $stmtCat->fetchAll();
 ?>
@@ -58,12 +57,11 @@ $categories = $stmtCat->fetchAll();
         .pos-header { background-color: var(--pastel-pink); padding: 25px 20px 35px 20px; color: var(--text-dark); border-bottom-left-radius: 25px; border-bottom-right-radius: 25px; box-shadow: 0 4px 15px rgba(250, 218, 221, 0.5); }
         .cafe-brand { font-size: 1.6rem; font-weight: 800; color: var(--text-dark); letter-spacing: 1px; margin: 0; }
         .cafe-brand span { color: #D98A8A; }
-        .pos-tabs { display: flex; gap: 25px; font-size: 1.05rem; font-weight: 600; }
+        .pos-tabs { display: flex; gap: 25px; font-size: 1.05rem; font-weight: 600; flex-wrap: wrap; margin-top: 20px;}
         .pos-tab-link { color: #A88B8E; text-decoration: none; padding-bottom: 5px; position: relative; transition: 0.2s; }
         .pos-tab-link.active { color: var(--text-dark); }
         .pos-tab-link.active::after { content: ''; position: absolute; bottom: -4px; left: 0; width: 100%; height: 3px; background-color: var(--text-dark); border-radius: 3px; }
-        .btn-add { color: var(--text-dark); font-size: 1.8rem; line-height: 1; text-decoration: none; font-weight: 500; transition: transform 0.2s; background: rgba(255,255,255,0.4); width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
-        .btn-add:hover { transform: scale(1.1); background: rgba(255,255,255,0.7); }
+        
         .search-bar { background-color: var(--bg-card); border-radius: 16px; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; margin-top: 20px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02); border: 2px solid #FFF0F2; }
         .search-input { border: none; outline: none; width: 100%; margin-left: 10px; font-family: 'Poppins', sans-serif; color: var(--text-dark); background: transparent; font-size: 0.95rem; }
         .category-scroll { display: flex; flex-direction: row; flex-wrap: nowrap; gap: 12px; padding: 20px; margin-bottom: 5px; overflow-x: auto; white-space: nowrap; -ms-overflow-style: none; scrollbar-width: none; }
@@ -77,11 +75,23 @@ $categories = $stmtCat->fetchAll();
         .product-title { font-weight: 700; font-size: 1rem; color: var(--text-dark); margin-bottom: 4px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .product-price { font-size: 0.9rem; color: var(--text-muted); font-weight: 600; }
         .stock-badge { position: absolute; top: 12px; right: 12px; background: var(--pastel-yellow); color: var(--text-dark); font-size: 0.75rem; font-weight: 700; padding: 5px 12px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .btn-action-pos { font-size: 0.85rem; font-weight: 600; padding: 10px; border-radius: 12px; transition: 0.2s; border: none; }
+        
+        .btn-action-pos { font-size: 0.85rem; font-weight: 600; padding: 10px; border-radius: 12px; transition: 0.2s; border: none; display: flex; align-items: center; justify-content: center; text-decoration: none;}
         .btn-pesan { background-color: var(--pastel-blue); color: var(--text-dark); }
-        .btn-pesan:hover { filter: brightness(0.95); }
+        .btn-pesan:hover { filter: brightness(0.95); color: var(--text-dark); }
+        .btn-edit-pos { background-color: var(--pastel-peach); color: var(--text-dark); border: 2px solid #FDE4E4; }
+        .btn-edit-pos:hover { background-color: #F5CBAE; color: var(--text-dark); border-color: #F5CBAE; }
+        
+        /* Tombol Hapus */
         .btn-hapus { background-color: transparent; color: #D98A8A; border: 2px solid #FDE4E4; }
-        .btn-hapus:hover { background-color: var(--pastel-peach); border-color: var(--pastel-peach); color: var(--text-dark); }
+        .btn-hapus:hover { background-color: #FDE4E4; border-color: #FDE4E4; color: var(--text-dark); }
+
+        /* Modal Pop-up */
+        .modal-content { border-radius: 24px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .btn-modal-cancel { background-color: #F3F4F6; color: #4A4A4A; border-radius: 12px; font-weight: 600; border: none; padding: 10px 24px; transition: 0.2s; }
+        .btn-modal-cancel:hover { background-color: #E5E7EB; }
+        .btn-modal-delete { background-color: #D98A8A; color: white; border-radius: 12px; font-weight: 600; border: none; padding: 10px 24px; transition: 0.2s; }
+        .btn-modal-delete:hover { background-color: #C07979; color: white; }
     </style>
 </head>
 <body>
@@ -90,12 +100,10 @@ $categories = $stmtCat->fetchAll();
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1 class="cafe-brand">☕ RUANG <span>RINDU</span></h1>
             <div class="d-flex gap-2 align-items-center">
-                <!-- Tambah Menu Hanya Muncul Kalau Admin -->
                 <?php if($_SESSION['role'] === 'admin'): ?>
-                    <a href="create.php" class="btn-add" title="Tambah Menu">+</a>
+                    <a href="create.php" class="btn btn-sm" style="background:#B5EAD7; color:#4A4A4A; border-radius:10px; font-weight:600; padding: 6px 14px; text-decoration: none;">+ Tambah Menu</a>
                 <?php endif; ?>
-                <!-- Tombol ke Dashboard -->
-                <a href="dashboard.php" class="btn btn-sm" style="background:#FFFFFF; color:#4A4A4A; border-radius:10px; font-weight:600;">Dashboard</a>
+                <a href="dashboard.php" class="btn btn-sm" style="background:#FFFFFF; color:#4A4A4A; border-radius:10px; font-weight:600; padding: 6px 14px; text-decoration: none;">Dashboard</a>
             </div>
         </div>
 
@@ -103,6 +111,8 @@ $categories = $stmtCat->fetchAll();
             <a href="index.php" class="pos-tab-link active">Kasir</a>
             <a href="history.php" class="pos-tab-link">Order</a>
             <a href="manage.php" class="pos-tab-link">Kelola</a>
+            <a href="master_data.php" class="pos-tab-link">Master Data</a>
+            <a href="stock_in.php" class="pos-tab-link">Barang Masuk</a>
         </div>
 
         <div class="search-bar">
@@ -113,7 +123,7 @@ $categories = $stmtCat->fetchAll();
         </div>
     </div>
 
-    <!-- Kategori Filter (Berubah Otomatis Sesuai Database) -->
+    <!-- Kategori Filter -->
     <div class="category-scroll">
         <div class="pill-btn filter-btn active">Semua</div>
         <?php foreach ($categories as $cat): ?>
@@ -129,7 +139,10 @@ $categories = $stmtCat->fetchAll();
         <?php else: ?>
             <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3" id="productContainer">
                 <?php foreach ($products as $product): ?>
-                    <div class="col product-item" data-category="<?= htmlspecialchars(strtolower(trim($product['category_name'] ?? '')), ENT_QUOTES, 'UTF-8') ?>">
+                    <?php 
+                        $catName = isset($product['category_name']) && $product['category_name'] ? strtolower(trim($product['category_name'])) : ''; 
+                    ?>
+                    <div class="col product-item" data-category="<?= htmlspecialchars($catName, ENT_QUOTES, 'UTF-8') ?>">
                         <div class="product-card h-100 d-flex flex-column">
                             
                             <?php 
@@ -148,13 +161,19 @@ $categories = $stmtCat->fetchAll();
                                 <div class="product-price mb-4">Rp <?= number_format($product["price"], 0, ',', '.') ?></div>
                                 
                                 <div class="mt-auto d-flex gap-2">
-                                    <a href="order.php?id=<?= $product['id'] ?>" class="btn btn-action-pos btn-pesan flex-grow-1 text-center text-decoration-none">Pesan</a>
+                                    <a href="order.php?id=<?= $product['id'] ?>" class="btn btn-action-pos btn-pesan flex-grow-1 text-decoration-none">Pesan</a>
                                     
                                     <?php if($_SESSION['role'] === 'admin'): ?>
-                                    <form method="POST" action="" onsubmit="return confirm('Hapus produk ini?');" class="m-0 flex-grow-1">
-                                        <input type="hidden" name="delete_id" value="<?= $product['id'] ?>">
-                                        <button type="submit" class="btn btn-action-pos btn-hapus w-100">Hapus</button>
-                                    </form>
+                                    <a href="edit.php?id=<?= $product['id'] ?>" class="btn btn-action-pos btn-edit-pos flex-grow-1 text-decoration-none">Edit</a>
+                                    
+                                    <!-- Tombol Hapus memicu Modal (Sama seperti manage.php) -->
+                                    <button type="button" class="btn btn-action-pos btn-hapus flex-grow-1" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#deleteModal" 
+                                        data-id="<?= $product['id'] ?>" 
+                                        data-name="<?= htmlspecialchars($product['name'], ENT_QUOTES, 'UTF-8') ?>">
+                                        Hapus
+                                    </button>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -169,8 +188,35 @@ $categories = $stmtCat->fetchAll();
         <?php endif; ?>
     </div>
 
+    <!-- MODAL POP-UP KONFIRMASI HAPUS -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-body text-center p-5">
+                    <div class="mb-3" style="font-size: 3rem;">🗑️</div>
+                    <h4 class="fw-bold mb-3" style="color: #4A4A4A;">Konfirmasi Hapus</h4>
+                    <p class="mb-4 text-muted" style="font-size: 0.95rem;">
+                        Apakah Anda yakin ingin menghapus menu <br>
+                        <strong id="productNameToDelete" style="color: #D98A8A; font-size: 1.1rem;"></strong>? <br>
+                        <span style="font-size: 0.85rem;">Tindakan ini tidak dapat dibatalkan.</span>
+                    </p>
+                    <form method="POST" action="">
+                        <input type="hidden" name="delete_id" id="deleteProductId">
+                        <div class="d-flex justify-content-center gap-3">
+                            <button type="button" class="btn btn-modal-cancel" data-bs-dismiss="modal">Batal</button>
+                            <button type="submit" class="btn btn-modal-delete">Ya, Hapus</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Logika Search dan Kategori
             const searchInput = document.getElementById('searchInput');
             const filterBtns = document.querySelectorAll('.filter-btn');
             const productItems = document.querySelectorAll('.product-item');
@@ -179,11 +225,12 @@ $categories = $stmtCat->fetchAll();
             let currentCategory = 'Semua';
 
             function filterProducts() {
-                const searchTerm = searchInput.value.toLowerCase().trim();
+                const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
                 let visibleCount = 0;
 
                 productItems.forEach(item => {
-                    const title = item.querySelector('.product-title').innerText.toLowerCase();
+                    const titleEl = item.querySelector('.product-title');
+                    const title = titleEl ? titleEl.innerText.toLowerCase() : '';
                     const category = item.getAttribute('data-category'); 
                     const btnCategory = currentCategory.toLowerCase(); 
                     
@@ -204,10 +251,12 @@ $categories = $stmtCat->fetchAll();
                     }
                 });
 
-                if (visibleCount === 0 && productItems.length > 0) {
-                    noResultMsg.classList.remove('d-none');
-                } else {
-                    noResultMsg.classList.add('d-none');
+                if (noResultMsg) {
+                    if (visibleCount === 0 && productItems.length > 0) {
+                        noResultMsg.classList.remove('d-none');
+                    } else {
+                        noResultMsg.classList.add('d-none');
+                    }
                 }
             }
 
@@ -221,6 +270,22 @@ $categories = $stmtCat->fetchAll();
                     filterProducts();
                 });
             });
+
+            // Script Modal Hapus
+            var deleteModal = document.getElementById('deleteModal');
+            if(deleteModal) {
+                deleteModal.addEventListener('show.bs.modal', function (event) {
+                    var button = event.relatedTarget;
+                    var productId = button.getAttribute('data-id');
+                    var productName = button.getAttribute('data-name');
+                    
+                    var modalProductName = deleteModal.querySelector('#productNameToDelete');
+                    var modalInputId = deleteModal.querySelector('#deleteProductId');
+                    
+                    if(modalProductName) modalProductName.textContent = productName;
+                    if(modalInputId) modalInputId.value = productId;
+                });
+            }
         });
     </script>
 </body>

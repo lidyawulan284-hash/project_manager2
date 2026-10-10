@@ -1,41 +1,37 @@
 <?php
 session_start();
-
-// Mematikan tampilan tulisan error default PHP yang merusak desain
 error_reporting(0);
 ini_set('display_errors', 0);
 require 'config.php';
 
-// HANYA ADMIN YANG BOLEH MENAMBAH PRODUK BARU
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
     die("<h2 style='text-align:center; margin-top:50px; font-family:sans-serif;'>Akses Ditolak! Hanya Admin yang boleh mengakses halaman ini.</h2>");
 }
 
-// Ambil data kategori dari database untuk pilihan form
 $stmtCat = $pdo->query("SELECT * FROM categories");
 $categories = $stmtCat->fetchAll();
 
 $errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $sku = trim($_POST['sku']);
     $name = trim($_POST['name']);
     $category_id = (int) $_POST['category_id'];
     $price = (float) $_POST['price'];
     $stock = (int) $_POST['stock'];
     $imageName = null;
 
-    if (strlen($name) < 3) $errors[] = "Nama produk minimum 3 aksara.";
-    if ($price <= 0) $errors[] = "Harga mesti lebih daripada 0.";
+    if (strlen($name) < 3) $errors[] = "Nama produk minimum 3 karakter.";
+    if ($price <= 0) $errors[] = "Harga harus lebih dari 0.";
     if ($stock < 0) $errors[] = "Stok tidak boleh negatif.";
     if (empty($category_id)) $errors[] = "Kategori wajib dipilih.";
 
     $stmt = $pdo->prepare("SELECT id FROM products WHERE name = ?");
     $stmt->execute([$name]);
     if ($stmt->fetch()) {
-        $errors[] = "Nama produk sudah didaftarkan.";
+        $errors[] = "Nama produk sudah terdaftar.";
     }
 
-    // PROSES MUAT NAIK GAMBAR
     if (empty($errors) && isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
         $tmpName = $_FILES['image']['tmp_name'];
         $fileName = basename($_FILES['image']['name']);
@@ -43,20 +39,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $imageName = time() . '_' . preg_replace("/[^a-zA-Z0-9.]/", "", $fileName); 
         $uploadDir = 'uploads/';
         
-        // --- SCRIPT OTOMATIS: BUAT FOLDER JIKA BELUM ADA ---
         if (!is_dir($uploadDir)) {
             mkdir($uploadDir, 0777, true);
         }
-        // ---------------------------------------------------
 
         if (!move_uploaded_file($tmpName, $uploadDir . $imageName)) {
-            $errors[] = "Gagal memuat naik gambar. Pastikan file tidak rusak.";
+            $errors[] = "Gagal mengupload gambar. Pastikan file tidak rusak.";
         }
     }
 
     if (empty($errors)) {
-        $stmt = $pdo->prepare("INSERT INTO products (name, category_id, price, stock, image) VALUES (?, ?, ?, ?, ?)");
-        $stmt->execute([$name, $category_id, $price, $stock, $imageName]);
+        // Query insert sekarang menyertakan SKU
+        $stmt = $pdo->prepare("INSERT INTO products (sku, name, category_id, price, stock, image) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$sku, $name, $category_id, $price, $stock, $imageName]);
         
         header("Location: index.php");
         exit;
@@ -102,13 +97,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <form method="POST" enctype="multipart/form-data" class="form-card p-4 p-md-5">
             <div class="mb-3">
+                <label class="form-label">SKU (Kode Produk)</label>
+                <input type="text" name="sku" class="form-control" placeholder="Opsional (Contoh: CF-001)" value="<?= htmlspecialchars($_POST['sku'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+            </div>
+
+            <div class="mb-3">
                 <label class="form-label">Nama Menu</label>
                 <input type="text" name="name" class="form-control" required placeholder="Contoh: Iced Americano" value="<?= htmlspecialchars($_POST['name'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
             </div>
             
             <div class="mb-3">
                 <label class="form-label">Kategori</label>
-                <!-- DATA KATEGORI DIAMBIL DARI DATABASE -->
                 <select name="category_id" class="form-select" required>
                     <option value="" disabled <?= empty($_POST['category_id']) ? 'selected' : '' ?>>-- Pilih Kategori --</option>
                     <?php foreach ($categories as $cat): ?>
